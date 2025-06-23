@@ -9,7 +9,7 @@ from datetime import datetime
 
 # Inicializa a app do Firebase 
 if not firebase_admin._apps:
-    cred = credentials.Certificate(st.secrets["firebase_credentials"])
+    cred = credentials.Certificate(dict(st.secrets["firebase_credentials"]))
     firebase_admin.initialize_app(cred)
 
 # Conecta com o Firestore
