@@ -1,0 +1,13 @@
+streamlit
+pyyaml
+streamlit-authenticator
+pandas
+plotly
+bcrypt
+openai
+langchain
+langchain-openai
+python-dotenv
+firebase-admin
+openpyxl
+python-docx
