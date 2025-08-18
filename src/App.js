@@ -24,17 +24,25 @@ const SurveyApp = () => {
     setShowDemographics(true);
   };
 
-  const handleDemographicsSubmit = async (demographics) => {
-    setParticipant((prev) => ({ ...prev, ...demographics }));
-    setShowDemographics(false);
-    setStarted(true);
-    try {
-      await loadImagesWithFolderLogic();
-    } catch (error) {
+const handleDemographicsSubmit = async (demographics) => {
+  setParticipant((prev) => ({ ...prev, ...demographics }));
+  setShowDemographics(false);
+  try {
+    // load images
+    const groups = await loadImagesWithFolderLogic();
+
+    if (groups.length > 0) {
+      // start survey if exists images available
+      setStarted(true);
+    } else {
+      alert("The survey is completly answered.");
       setStarted(false);
-      alert("Failed to load survey images. Please try again.");
     }
-  };
+  } catch (error) {
+    alert("Failed to load survey. Please try again.");
+    setStarted(false);
+  }
+};
 
   const handleSurveyComplete = () => {
     setSurveyCompleted(true);
