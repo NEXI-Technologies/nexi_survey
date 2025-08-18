@@ -46,8 +46,8 @@ export const useImageLoader = () => {
     try {
       // Subpastas já usadas
       const usedPaths = await getUsedSubfolders();
-      console.log("Número de subpastas já usadas:", usedPaths.size);
-      console.log("Subpastas já usadas:", Array.from(usedPaths));
+      // console.log("Número de subpastas já usadas:", usedPaths.size);
+      // console.log("Subpastas já usadas:", Array.from(usedPaths));
 
       // Todas as pastas principais
       const rootRef = ref(storage, "/");
@@ -64,11 +64,11 @@ export const useImageLoader = () => {
         }
       }
 
-      console.log("Número de pastas principais disponíveis:", availableMainFolders.length);
-      console.log(
-        "Número total de subpastas disponíveis:",
-        availableMainFolders.reduce((acc, folder) => acc + folder.subFolders.length, 0)
-      );
+      // console.log("Número de pastas principais disponíveis:", availableMainFolders.length);
+      // console.log(
+      //   "Número total de subpastas disponíveis:",
+      //   availableMainFolders.reduce((acc, folder) => acc + folder.subFolders.length, 0)
+      // );
 
       // 🔑 Criar lista única com TODAS as subpastas disponíveis
       const allAvailableSubfolders = [];
