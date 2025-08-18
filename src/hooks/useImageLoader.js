@@ -78,10 +78,10 @@ export const useImageLoader = () => {
         }
       }
 
-      // 🔑 Escolher até 4 subpastas diferentes (sem repetir)
+      // Escolher até 5 subpastas diferentes (sem repetir)
       const selectedSubfolders = getRandomElements(
         allAvailableSubfolders,
-        Math.min(4, allAvailableSubfolders.length)
+        Math.min(5, allAvailableSubfolders.length)
       );
 
       let allGroups = [];
