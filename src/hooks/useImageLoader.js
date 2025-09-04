@@ -8,12 +8,21 @@ export const useImageLoader = () => {
   const [loadingImages, setLoadingImages] = useState(false);
   const [error, setError] = useState(null);
 
+  // Configuration: Number of least responded datasets to select
+  const MAX_DATASETS_TO_SELECT = 5;
+
+  const EXCLUDED_DATASETS = [
+    "Zoom_Class_Meeting_Downing_Soc_220_2-18-2021-clean",
+    "TMU_-_History_102_-_ZOOM_Class_Meeting_-_March_25th,_2020-clean",
+    "2021-05-24_-_Club_Meeting_-_Gallery_View-clean"
+  ];
+
   const getRandomElement = (array) => {
     return array[Math.floor(Math.random() * array.length)];
   };
 
   const getRandomElements = (array, n) => {
-    // Retorna até N elementos diferentes do array (sem repetir)
+    // Returns up to N different elements from array (without repeating)
     const arr = [...array];
     const result = [];
     while (arr.length && result.length < n) {
@@ -23,7 +32,23 @@ export const useImageLoader = () => {
     return result;
   };
 
-  // Lê do Firestore as subpastas já usadas
+  // Counts the number of responses per dataset
+  const getDatasetResponseCounts = async () => {
+    const datasetCounts = new Map();
+
+    const querySnapshot = await getDocs(collection(db, "global-survey-evaluations"));
+    querySnapshot.forEach((doc) => {
+      const data = doc.data();
+      if (data.image && data.image.dataset) {
+        const dataset = data.image.dataset;
+        datasetCounts.set(dataset, (datasetCounts.get(dataset) || 0) + 1);
+      }
+    });
+
+    return datasetCounts;
+  };
+
+  // Reads from Firestore the subfolders already used
   const getUsedSubfolders = async () => {
     const usedPaths = new Set();
 
@@ -44,46 +69,100 @@ export const useImageLoader = () => {
     setError(null);
 
     try {
-      // Subpastas já usadas
-      const usedPaths = await getUsedSubfolders();
-      // console.log("Número de subpastas já usadas:", usedPaths.size);
-      // console.log("Subpastas já usadas:", Array.from(usedPaths));
+      // 1. Get response counts per dataset and already used subfolders
+      const [datasetCounts, usedPaths] = await Promise.all([
+        getDatasetResponseCounts(),
+        getUsedSubfolders()
+      ]);
 
-      // Todas as pastas principais
+      console.log("Dataset count:", Object.fromEntries(datasetCounts));
+
+      // 2. Get all main folders from storage
       const rootRef = ref(storage, "/");
       const rootResult = await listAll(rootRef);
 
-      const availableMainFolders = [];
-      for (const mainFolder of rootResult.prefixes) {
-        const subFoldersResult = await listAll(mainFolder);
-        const filteredSubs = subFoldersResult.prefixes.filter(
-          (sf) => !usedPaths.has(`${mainFolder.name}/${sf.name}`)
-        );
-        if (filteredSubs.length > 0) {
-          availableMainFolders.push({ mainFolder, subFolders: filteredSubs });
-        }
-      }
-
-      // console.log("Número de pastas principais disponíveis:", availableMainFolders.length);
-      // console.log(
-      //   "Número total de subpastas disponíveis:",
-      //   availableMainFolders.reduce((acc, folder) => acc + folder.subFolders.length, 0)
-      // );
-
-      // 🔑 Criar lista única com TODAS as subpastas disponíveis
-      const allAvailableSubfolders = [];
-      for (const { mainFolder, subFolders } of availableMainFolders) {
-        for (const sub of subFolders) {
-          allAvailableSubfolders.push({ mainFolder, subFolder: sub });
-        }
-      }
-
-      // Escolher até 5 subpastas diferentes (sem repetir)
-      const selectedSubfolders = getRandomElements(
-        allAvailableSubfolders,
-        Math.min(5, allAvailableSubfolders.length)
+      // 3. Filter excluded datasets
+      const filteredMainFolders = rootResult.prefixes.filter(
+        (mainFolder) => !EXCLUDED_DATASETS.includes(mainFolder.name)
       );
 
+      // 4. Calculate available datasets with unused subfolders
+      const availableDatasets = [];
+      for (const mainFolder of filteredMainFolders) {
+        const subFoldersResult = await listAll(mainFolder);
+        const availableSubfolders = subFoldersResult.prefixes.filter(
+          (sf) => !usedPaths.has(`${mainFolder.name}/${sf.name}`)
+        );
+        
+        if (availableSubfolders.length > 0) {
+          const responseCount = datasetCounts.get(mainFolder.name) || 0;
+          availableDatasets.push({
+            mainFolder,
+            subFolders: availableSubfolders,
+            responseCount
+          });
+        }
+      }
+
+      // 5. Sort datasets by response count (least responded first)
+      availableDatasets.sort((a, b) => a.responseCount - b.responseCount);
+
+      // 6. Select the least responded datasets (up to MAX_DATASETS_TO_SELECT)
+      const selectedDatasets = availableDatasets.slice(0, Math.min(MAX_DATASETS_TO_SELECT, availableDatasets.length));
+
+      console.log("Selected datasets (less answered):", 
+        selectedDatasets.map(d => ({ 
+          name: d.mainFolder.name, 
+          responses: d.responseCount,
+          availableSubfolders: d.subFolders.length 
+        }))
+      );
+
+      // 7. Select 1 subfolder from each dataset, completing with the least responded if needed
+      const selectedSubfolders = [];
+      
+      // First, add 1 subfolder from each available dataset
+      for (const dataset of selectedDatasets) {
+        if (selectedSubfolders.length < 5) {
+          const randomSubfolder = getRandomElement(dataset.subFolders);
+          selectedSubfolders.push({
+            mainFolder: dataset.mainFolder,
+            subFolder: randomSubfolder
+          });
+        }
+      }
+
+      // If we have less than 5 subfolders and there are still datasets available,
+      // complete with additional subfolders from the least responded dataset
+      if (selectedSubfolders.length < 5 && selectedDatasets.length > 0) {
+        const leastRespondedDataset = selectedDatasets[0]; // First in list (least responded)
+        
+        // Subfolders already selected from this dataset
+        const alreadySelected = selectedSubfolders
+          .filter(s => s.mainFolder.name === leastRespondedDataset.mainFolder.name)
+          .map(s => s.subFolder.name);
+        
+        // Available subfolders that haven't been selected yet
+        const remainingSubfolders = leastRespondedDataset.subFolders
+          .filter(sf => !alreadySelected.includes(sf.name));
+        
+        // Add additional subfolders until we reach 5
+        const needed = 5 - selectedSubfolders.length;
+        const additionalSubfolders = getRandomElements(remainingSubfolders, Math.min(needed, remainingSubfolders.length));
+        
+        for (const subFolder of additionalSubfolders) {
+          selectedSubfolders.push({
+            mainFolder: leastRespondedDataset.mainFolder,
+            subFolder: subFolder
+          });
+        }
+      }
+
+      console.log("Selected subfolders:", 
+        selectedSubfolders.map(s => `${s.mainFolder.name}/${s.subFolder.name}`)
+      );
+
+      // 8. Process images from selected subfolders
       let allGroups = [];
       for (const { mainFolder, subFolder } of selectedSubfolders) {
         const datasetName = mainFolder.name;
@@ -91,7 +170,7 @@ export const useImageLoader = () => {
         const subfolderResult = await listAll(subFolder);
         if (subfolderResult.items.length === 0) continue;
 
-        // Contexto (imagem "0") e avaliações
+        // Context image ("0") and evaluation images
         const contextItem = subfolderResult.items.find(
           (item) => item.name.split(".")[0] === "0"
         );
@@ -156,122 +235,3 @@ export const useImageLoader = () => {
     resetImages,
   };
 };
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-  // const loadImagesWithFolderLogic = async () => {
-  //   setLoadingImages(true);
-  //   setError(null);
-
-  //   try {
-  //     // Step 1: Get all top-level folders
-  //     const rootRef = ref(storage, "/");
-  //     const rootResult = await listAll(rootRef);
-
-  //     if (rootResult.prefixes.length === 0) {
-  //       throw new Error("No folders found in survey-images/");
-  //     }
-
-  //     // Step 2: Randomly select 4 top-level folders (or less if not enough)
-  //     const selectedMainFolders = getRandomElements(rootResult.prefixes, 4);
-
-  //     let allGroups = [];
-
-  //     for (const selectedMainFolder of selectedMainFolders) {
-  //       const datasetName = selectedMainFolder.name;
-  //       // Step 3: Get all subfolders from the selected main folder
-  //       const subFoldersResult = await listAll(selectedMainFolder);
-
-  //       if (subFoldersResult.prefixes.length === 0) {
-  //         continue;
-  //       }
-
-  //       // Step 4: Randomly select 1 subfolder from each main folder
-  //       const selectedSubfolder = getRandomElement(subFoldersResult.prefixes);
-
-  //       // Step 5: Process the selected subfolder
-  //       const subfolderResult = await listAll(selectedSubfolder);
-
-  //       if (subfolderResult.items.length === 0) {
-  //         continue;
-  //       }
-
-  //       // Process context and evaluation images
-  //       const contextItem = subfolderResult.items.find(
-  //         (item) => item.name.split(".")[0] === "0"
-  //       );
-  //       const evaluationItems = subfolderResult.items.filter(
-  //         (item) => item.name.split(".")[0] !== "0"
-  //       );
-
-  //       let contextImage = null;
-  //       if (contextItem) {
-  //         const contextUrl = await getDownloadURL(contextItem);
-  //         contextImage = {
-  //           name: contextItem.name,
-  //           url: contextUrl,
-  //           folder: selectedSubfolder.name,
-  //           datasetName,
-  //           isContext: true,
-  //           fileName: "0",
-  //         };
-  //       }
-
-  //       const evaluationImages = [];
-  //       for (const img of evaluationItems) {
-  //         const url = await getDownloadURL(img);
-  //         const nameWithoutExt = img.name.split(".")[0];
-  //         evaluationImages.push({
-  //           name: img.name,
-  //           url: url,
-  //           folder: selectedSubfolder.name,
-  //           datasetName,
-  //           isContext: false,
-  //           fileName: nameWithoutExt,
-  //         });
-  //       }
-
-  //       if (contextImage && evaluationImages.length > 0) {
-  //         allGroups.push({
-  //           contextImage,
-  //           evaluationImages,
-  //         });
-  //       }
-  //     }
-
-  //     setSelectedImages(allGroups);
-  //     return allGroups;
-  //   } catch (error) {
-  //     console.error("Error loading images:", error);
-  //     setError(error.message);
-  //     setSelectedImages([]);
-  //     throw error;
-  //   } finally {
-  //     setLoadingImages(false);
-  //   }
-  // };
