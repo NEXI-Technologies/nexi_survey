@@ -75,7 +75,7 @@ export const useImageLoader = () => {
         getUsedSubfolders()
       ]);
 
-      console.log("Dataset count:", Object.fromEntries(datasetCounts));
+      // console.log("Dataset count:", Object.fromEntries(datasetCounts));
 
       // 2. Get all main folders from storage
       const rootRef = ref(storage, "/");
@@ -110,13 +110,13 @@ export const useImageLoader = () => {
       // 6. Select the least responded datasets (up to MAX_DATASETS_TO_SELECT)
       const selectedDatasets = availableDatasets.slice(0, Math.min(MAX_DATASETS_TO_SELECT, availableDatasets.length));
 
-      console.log("Selected datasets (less answered):", 
-        selectedDatasets.map(d => ({ 
-          name: d.mainFolder.name, 
-          responses: d.responseCount,
-          availableSubfolders: d.subFolders.length 
-        }))
-      );
+      // console.log("Selected datasets (less answered):", 
+      //   selectedDatasets.map(d => ({ 
+      //     name: d.mainFolder.name, 
+      //     responses: d.responseCount,
+      //     availableSubfolders: d.subFolders.length 
+      //   }))
+      // );
 
       // 7. Select 1 subfolder from each dataset, completing with the least responded if needed
       const selectedSubfolders = [];
@@ -158,9 +158,9 @@ export const useImageLoader = () => {
         }
       }
 
-      console.log("Selected subfolders:", 
-        selectedSubfolders.map(s => `${s.mainFolder.name}/${s.subFolder.name}`)
-      );
+      // console.log("Selected subfolders:", 
+      //   selectedSubfolders.map(s => `${s.mainFolder.name}/${s.subFolder.name}`)
+      // );
 
       // 8. Process images from selected subfolders
       let allGroups = [];
