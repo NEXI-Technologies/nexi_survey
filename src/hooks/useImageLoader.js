@@ -123,7 +123,7 @@ export const useImageLoader = () => {
       
       // First, add 1 subfolder from each available dataset
       for (const dataset of selectedDatasets) {
-        if (selectedSubfolders.length < 5) {
+        if (selectedSubfolders.length < MAX_DATASETS_TO_SELECT) {
           const randomSubfolder = getRandomElement(dataset.subFolders);
           selectedSubfolders.push({
             mainFolder: dataset.mainFolder,
@@ -132,9 +132,9 @@ export const useImageLoader = () => {
         }
       }
 
-      // If we have less than 5 subfolders and there are still datasets available,
+      // If we have less than MAX_DATASETS_TO_SELECT subfolders and there are still datasets available,
       // complete with additional subfolders from the least responded dataset
-      if (selectedSubfolders.length < 5 && selectedDatasets.length > 0) {
+      if (selectedSubfolders.length < MAX_DATASETS_TO_SELECT && selectedDatasets.length > 0) {
         const leastRespondedDataset = selectedDatasets[0]; // First in list (least responded)
         
         // Subfolders already selected from this dataset
@@ -145,9 +145,9 @@ export const useImageLoader = () => {
         // Available subfolders that haven't been selected yet
         const remainingSubfolders = leastRespondedDataset.subFolders
           .filter(sf => !alreadySelected.includes(sf.name));
-        
-        // Add additional subfolders until we reach 5
-        const needed = 5 - selectedSubfolders.length;
+
+        // Add additional subfolders until we reach the maximum
+        const needed = MAX_DATASETS_TO_SELECT - selectedSubfolders.length;
         const additionalSubfolders = getRandomElements(remainingSubfolders, Math.min(needed, remainingSubfolders.length));
         
         for (const subFolder of additionalSubfolders) {
@@ -158,9 +158,7 @@ export const useImageLoader = () => {
         }
       }
 
-      // console.log("Selected subfolders:", 
-      //   selectedSubfolders.map(s => `${s.mainFolder.name}/${s.subFolder.name}`)
-      // );
+      // console.log("Selected subfolders:", selectedSubfolders.map(s => `${s.mainFolder.name}/${s.subFolder.name}`));
 
       // 8. Process images from selected subfolders
       let allGroups = [];
