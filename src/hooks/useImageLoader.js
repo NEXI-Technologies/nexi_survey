@@ -9,7 +9,7 @@ export const useImageLoader = () => {
   const [error, setError] = useState(null);
 
   // Configuration: Number of least responded datasets to select
-  const MAX_DATASETS_TO_SELECT = 5;
+  const MAX_DATASETS_TO_SELECT = 7;
 
   const EXCLUDED_DATASETS = [
     "Zoom_Class_Meeting_Downing_Soc_220_2-18-2021-clean",
